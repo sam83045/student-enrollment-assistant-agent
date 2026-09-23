@@ -122,18 +122,18 @@ Rules:
 
 ## Phase F — HTTP API
 
-- [ ] **T-16 Web dependencies** · design §15.1
+- [x] **T-16 Web dependencies** · design §15.1
   - `uv add fastapi uvicorn streamlit httpx`; add the `enrollment-api = enrollment_agent.api:main`
     console script.
   - Done when: `uv sync` succeeds and the existing 80 tests still pass.
 
-- [ ] **T-16b Async agent path** · D-9 · design §15.2
+- [x] **T-16b Async agent path** · D-9 · design §15.2
   - `graph.py`: the `agent` node supports sync and async (a `RunnableLambda` with `afunc`), with
     the iteration cap shared. `agent.py`: `EnrollmentAgent.achat()` sharing helpers with `chat()`.
   - Tests (async, `anyio`, fake model): reply + tool events, memory across turns, iteration cap.
   - Done when: new tests and all existing tests pass (sync behavior unchanged).
 
-- [ ] **T-17 FastAPI app** · FR-12, NFR-7, NFR-8 · design §15.2
+- [x] **T-17 FastAPI app** · FR-12, NFR-7, NFR-8 · design §15.2
   - `api.py`: `create_app()`, the Pydantic schemas, async `POST /chat` (`await agent.achat`), `GET /health`, the error
     mapping, a lifespan that builds the agent from settings, module-level `app`, and `main()`
     with `--host/--port/--env-file`.

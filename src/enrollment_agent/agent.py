@@ -49,20 +49,33 @@ class EnrollmentAgent:
         return uuid.uuid4().hex
 
     def chat(self, message: str, session_id: str) -> TurnResult:
-        config = {
+        config = self._config(session_id)
+        before = len(self._graph.get_state(config).values.get("messages", []))
+        state = self._graph.invoke({"messages": [HumanMessage(message)]}, config)
+        return _turn_result(state["messages"][before:])
+
+    async def achat(self, message: str, session_id: str) -> TurnResult:
+        """Async version of ``chat`` for async servers (D-9); shares sessions with it."""
+        config = self._config(session_id)
+        before = len((await self._graph.aget_state(config)).values.get("messages", []))
+        state = await self._graph.ainvoke({"messages": [HumanMessage(message)]}, config)
+        return _turn_result(state["messages"][before:])
+
+    def _config(self, session_id: str) -> dict:
+        return {
             "configurable": {"thread_id": session_id},
             "recursion_limit": self._recursion_limit,
         }
-        before = len(self._graph.get_state(config).values.get("messages", []))
-        state = self._graph.invoke({"messages": [HumanMessage(message)]}, config)
-        new_messages = state["messages"][before:]
 
-        events: dict[str, ToolEvent] = {}
-        for msg in new_messages:
-            if isinstance(msg, AIMessage):
-                for call in msg.tool_calls:
-                    events[call["id"]] = ToolEvent(call["name"], call["args"])
-            elif isinstance(msg, ToolMessage) and msg.tool_call_id in events:
-                events[msg.tool_call_id].result = _text(msg.content)
 
-        return TurnResult(reply=_text(new_messages[-1].content), tool_events=list(events.values()))
+def _turn_result(new_messages: list) -> TurnResult:
+    """Reply and tool events from the messages added during one turn."""
+    events: dict[str, ToolEvent] = {}
+    for msg in new_messages:
+        if isinstance(msg, AIMessage):
+            for call in msg.tool_calls:
+                events[call["id"]] = ToolEvent(call["name"], call["args"])
+        elif isinstance(msg, ToolMessage) and msg.tool_call_id in events:
+            events[msg.tool_call_id].result = _text(msg.content)
+
+    return TurnResult(reply=_text(new_messages[-1].content), tool_events=list(events.values()))

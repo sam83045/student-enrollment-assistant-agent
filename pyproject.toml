@@ -7,14 +7,19 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "langchain-core>=1.6.4",
     "langchain-openai>=1.6.4",
     "langgraph>=1.2.12",
     "python-dotenv>=1.2.3",
+    "streamlit>=1.64.0",
+    "uvicorn>=0.53.0",
 ]
 
 [project.scripts]
 enrollment-agent = "enrollment_agent.cli:main"
+enrollment-api = "enrollment_agent.api:main"
 
 [build-system]
 requires = ["uv_build>=0.11.17,<0.12.0"]

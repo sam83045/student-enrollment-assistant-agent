@@ -2,6 +2,7 @@
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
@@ -32,14 +33,24 @@ def build_graph(
 ) -> CompiledStateGraph:
     model_with_tools = model.bind_tools(tools)
 
+    def capped(state: MessagesState) -> bool:
+        return _model_calls_this_turn(state["messages"]) >= max_iterations
+
+    def prompt(state: MessagesState) -> list:
+        return [SystemMessage(SYSTEM_PROMPT), *state["messages"]]
+
     def agent(state: MessagesState) -> dict:
-        if _model_calls_this_turn(state["messages"]) >= max_iterations:
+        if capped(state):
             return {"messages": [AIMessage(ESCALATION_MESSAGE)]}
-        response = model_with_tools.invoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])
-        return {"messages": [response]}
+        return {"messages": [model_with_tools.invoke(prompt(state))]}
+
+    async def aagent(state: MessagesState) -> dict:
+        if capped(state):
+            return {"messages": [AIMessage(ESCALATION_MESSAGE)]}
+        return {"messages": [await model_with_tools.ainvoke(prompt(state))]}
 
     builder = StateGraph(MessagesState)
-    builder.add_node("agent", agent)
+    builder.add_node("agent", RunnableLambda(agent, afunc=aagent, name="agent"))
     builder.add_node("tools", ToolNode(tools, handle_tool_errors=True))
     builder.add_edge(START, "agent")
     builder.add_conditional_edges("agent", tools_condition, ["tools", END])

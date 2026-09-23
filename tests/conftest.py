@@ -43,6 +43,11 @@ def answer(text: str) -> AIMessage:
 
 
 @pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture
 def fake_model():
     """Factory: ``fake_model([msg, msg, ...])`` or ``fake_model(infinite_iterator)``."""
 

@@ -62,7 +62,8 @@ scripts/
   run_demo.py      # 5-turn demo → docs/demo_log.md (FR-10)
 tests/
   conftest.py      # FakeToolChatModel fixture
-  test_tools.py    # FR-1..4 (no LLM)
+  test_data.py     # FR-4 mock data integrity
+  test_tools.py    # FR-1..3 matching, lookups, tool wrappers (no LLM)
   test_agent.py    # FR-5..8 with fake model
   test_demo_live.py# FR-10 against a real LLM, marked @pytest.mark.live
 docs/demo_log.md   # generated
@@ -120,13 +121,15 @@ Applicants:
 ### 5.2 Program name matching (shared by FR-1, FR-3)
 
 1. Normalize: lowercase, strip punctuation, collapse whitespace.
-2. Remove filler tokens: `program(s)`, `degree`, `in`, `of`, `the`, `a`.
-3. **Exact** match on normalized `program_name` or any alias → one result.
-4. Otherwise **keyword** match: every remaining query token appears in the name or an alias
+2. Remove filler tokens: `program(s)`, `degree(s)`, `in`, `of`, `the`, `a`, `an`, `all`.
+3. **Nothing left** (e.g. `"programs"`, `"all"`) → all programs.
+4. **Exact** match on normalized `program_name` or any alias → those programs.
+5. Otherwise **keyword** match: every remaining query token appears in the name or an alias
    → all such programs.
-5. No matches → not found.
+6. No matches → not found.
 
 `"computer science"` → `bs-cs`, `ms-cs`. `"M.S. Computer Science"` → `ms-cs`.
+`"all programs"` → all four.
 
 ### 5.3 Return shapes
 

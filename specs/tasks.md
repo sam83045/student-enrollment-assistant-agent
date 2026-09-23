@@ -22,25 +22,25 @@ Rules:
 
 ## Phase B — Data and Tools (no LLM)
 
-- [ ] **T-02 Mock data** · FR-4 · design §4
+- [x] **T-02 Mock data** · FR-4 · design §4
   - `data.py`: `PROGRAMS` (4, with aliases), `DEADLINES`, `APPLICANTS` (4).
   - Tests: ≥3 programs incl. CS; ≥3 applicants; APP-1042 is `Documents Pending` with
     non-empty `missing_documents`; every program has deadlines; every applicant's program exists.
   - Done when: AC-4.1–4.3 are covered by passing tests.
 
-- [ ] **T-03 Program name matching** · FR-1, FR-3 · design §5.2
+- [x] **T-03 Program name matching** · FR-1, FR-3 · design §5.2
   - Normalization, filler-token removal, exact match, then keyword match.
   - Tests: `"M.S. Computer Science"` → ms-cs; `"computer science"` → bs-cs + ms-cs;
-    `"cs"` alias; case/punctuation insensitivity; `"art history"` → none.
+    `"cs"` alias; case/punctuation insensitivity; `"all programs"` → all; `"art history"` → none.
   - Done when: matching tests pass.
 
-- [ ] **T-04 Lookup functions** · FR-1–3 · design §5.1, §5.3
+- [x] **T-04 Lookup functions** · FR-1–3 · design §5.1, §5.3
   - `lookup_program`, `lookup_deadlines`, `lookup_application` returning design §5.3 shapes.
   - Tests: single-match flat dict; multi-match `{"matches": [...]}`; not-found with
     `available_programs`; applicant ID case-insensitive (`app-1042`); unknown applicant.
   - Done when: AC-1.1–1.3, 2.1–2.3, 3.1 are covered by passing tests.
 
-- [ ] **T-05 LangChain tool wrappers** · FR-1–3 · design §5.1
+- [x] **T-05 LangChain tool wrappers** · FR-1–3 · design §5.1
   - `@tool` wrappers `get_program_info`, `check_application_status`, `get_deadlines`
     with guidance docstrings; `TOOLS` list.
   - Tests: tool names match the PDF; each schema has the right single string argument;

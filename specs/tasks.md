@@ -1,7 +1,7 @@
 # Tasks — Student Enrollment Assistant Agent (Phase 1)
 
 Implements: [requirements.md](requirements.md) · [design.md](design.md)
-Status: **Draft — awaiting review**
+Status: **Approved** (2026-09-23)
 
 Rules:
 - Work top to bottom. Write each task's tests first, then implement until they pass.
@@ -12,7 +12,7 @@ Rules:
 
 ## Phase A — Project Setup
 
-- [ ] **T-01 Scaffold the uv project** · NFR-1, NFR-4
+- [x] **T-01 Scaffold the uv project** · NFR-1, NFR-4
   - Create a packaged project with a `src/` layout and Python 3.12 (`requires-python >= 3.11`).
   - Add deps: `langchain-core`, `langchain-openai`, `langgraph`, `python-dotenv`; dev: `pytest`.
   - Add the console script `enrollment-agent = enrollment_agent.cli:main`.

@@ -1,0 +1,33 @@
+[project]
+name = "enrollment-agent"
+version = "0.1.0"
+description = "Student Enrollment Assistant Agent: a LangGraph tool-calling agent for university admissions questions."
+authors = [
+    { name = "Shoaib Konnur", email = "shoaib786k@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "langchain-core>=1.6.4",
+    "langchain-openai>=1.6.4",
+    "langgraph>=1.2.12",
+    "python-dotenv>=1.2.3",
+]
+
+[project.scripts]
+enrollment-agent = "enrollment_agent.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.17,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: end-to-end tests that call a real LLM (run with `-m live`)",
+]
+addopts = "-m 'not live'"

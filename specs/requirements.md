@@ -1,7 +1,7 @@
 # Requirements — Student Enrollment Assistant Agent
 
 Source: [assets/Agentic AI Case Study.pdf](../assets/Agentic%20AI%20Case%20Study.pdf)
-Status: **Approved**: Phase 1 (FR-1..11) and Phase 2 (FR-12..13), 2026-09-23
+Status: **Approved**: Phase 1 (FR-1..11), Phase 2 (FR-12..13) and Phase 3 (FR-14), 2026-09-23
 
 ## 1. Overview
 
@@ -20,11 +20,13 @@ Questions outside the tools' scope are escalated to an enrollment counselor.
 - A CLI chat and a scripted run of the 5-turn demo conversation with a full log.
 - Switchable LLM provider (OpenAI API or a local OpenAI-compatible LLM).
 - Phase 2: a FastAPI HTTP API and a Streamlit chat UI (FR-12, FR-13).
+- Phase 3: running the API and UI with Docker Compose (FR-14).
 
 **Out of scope**
 - Real databases, authentication, or persistence across sessions or server restarts.
 - Actually connecting the user to a counselor (the agent only offers to).
-- Streaming replies, containers, and switching the LLM provider from the UI.
+- Streaming replies, and switching the LLM provider from the UI.
+- Running the LLM itself in Docker, and running the tests in Docker.
 
 ## 3. Functional Requirements
 
@@ -130,6 +132,20 @@ Returns a dict with `program_name`, `application_deadline`,
   crashing, and the user can retry.
 - AC-13.7 The sidebar shows whether the API is reachable and which model it uses.
 
+### Containers (Phase 3)
+
+**FR-14 Docker Compose**
+- AC-14.1 `docker compose up --build` starts the API (port 8000) and the UI (port 8501). The UI
+  works in the browser exactly as it does without Docker.
+- AC-14.2 Both services run from one image built from the locked dependencies (`uv.lock`),
+  without dev dependencies, as a non-root user.
+- AC-14.3 LLM settings come from the project's `.env`. By default the containers reach
+  LM Studio running on the host; OpenAI (or another endpoint) can be selected without
+  editing any Docker file.
+- AC-14.4 The UI waits until the API reports healthy before it starts.
+- AC-14.5 No secrets are baked into the image: `.env` files are excluded from the build context.
+- AC-14.6 Ports are published on `127.0.0.1` only.
+
 ## 4. Non-Functional Requirements
 
 - **NFR-1 Stack:** Python 3.12 (`requires-python >= 3.11`), managed with **uv**.
@@ -157,4 +173,7 @@ Returns a dict with `program_name`, `application_deadline`,
 | A-5 | Escalation | Offer only; no real hand-off | |
 | A-6 | Web architecture | Streamlit → HTTP → FastAPI → agent (confirmed 2026-09-23) | |
 | A-7 | Web session persistence | In-memory only (confirmed) | SQLite checkpointer later |
-| A-8 | Web extras | Tool-call panel only (confirmed); no streaming, Docker or provider switch | |
+| A-8 | Web extras | Tool-call panel only (confirmed); no streaming or provider switch | Docker added in Phase 3 |
+| A-9 | Docker scope | API + UI containers; LLM stays on the host (confirmed 2026-09-23) | |
+| A-10 | Docker images | One image for both services (confirmed) | |
+| A-11 | Tests in Docker | No; tests run on the host (confirmed) | |

@@ -1,7 +1,7 @@
 # Tasks — Student Enrollment Assistant Agent
 
 Implements: [requirements.md](requirements.md) · [design.md](design.md)
-Status: **Approved**: Phase 1 (A–E) and Phase 2 (F–G), 2026-09-23
+Status: **Approved**: Phase 1 (A–E), Phase 2 (F–G) and Phase 3 (H), 2026-09-23
 
 Rules:
 - Work top to bottom. Write each task's tests first, then implement until they pass.
@@ -179,6 +179,29 @@ Rules:
 
 ---
 
+# Phase 3 — Docker (FR-14)
+
+## Phase H — Containers
+
+- [x] **T-21 Image** · AC-14.2, AC-14.5 · design §16.2
+  - `Dockerfile` (uv builder + slim runtime, non-root, cached dependency layer) and `.dockerignore`.
+  - Done when: `docker build -t enrollment-agent .` succeeds; the container runs as non-root;
+    the image contains no `.env`.
+
+- [x] **T-22 Compose** · AC-14.1, AC-14.3, AC-14.4, AC-14.6 · design §16.3
+  - `compose.yaml` with the `api` (healthcheck, `extra_hosts`, `LLM_BASE_URL` override) and
+    `ui` (`API_URL`, waits for a healthy API) services, ports on 127.0.0.1.
+  - Add `DOCKER_LLM_BASE_URL` to `.env.example`.
+  - Done when: `docker compose config` is valid and `docker compose up --build` passes the
+    checks in design §16.4 against LM Studio on the host.
+
+- [x] **T-23 Docs** · FR-14
+  - README: a Docker section (prerequisites, `up`/`down`/`logs`, switching to OpenAI,
+    LM Studio "Serve on Local Network" tip); update the layout and roadmap.
+  - Done when: the README steps reproduce the running stack.
+
+---
+
 ## Traceability
 
 | Requirement | Tasks |
@@ -193,6 +216,7 @@ Rules:
 | FR-11 | T-06, T-07 |
 | FR-12 | T-16, T-16b, T-17, T-20 |
 | FR-13 | T-18, T-19, T-20 |
+| FR-14 | T-21, T-22, T-23 |
 | NFR-1, NFR-4 | T-01, T-06 |
 | NFR-2 | T-02–T-10 |
 | NFR-3 | T-11, T-12 |

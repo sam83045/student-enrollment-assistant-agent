@@ -1,7 +1,7 @@
 # Design — Student Enrollment Assistant Agent
 
 Implements: [requirements.md](requirements.md)
-Status: **Approved**: Phase 1 (§1–14) and Phase 2 (§15), 2026-09-23
+Status: **Approved**: Phase 1 (§1–14), Phase 2 (§15) and Phase 3 (§16), 2026-09-23
 
 ## 1. Tech Stack
 
@@ -340,6 +340,7 @@ scripted `AIMessage`s in order.
 | FR-11 | 6 | manual (run against both providers) |
 | FR-12 | 15.2 | test_api |
 | FR-13 | 15.3, 15.4 | test_api_client, test_streamlit_app, manual |
+| FR-14 | 16 | manual (§16.4) |
 
 ## 14. Design Decisions
 
@@ -514,3 +515,95 @@ All approved 2026-09-23. D-9 was changed from the proposed sync endpoints to asy
 | D-10 | Server-generated session IDs; unknown IDs start an empty conversation | Track issued IDs and return 404 for unknown ones |
 | D-11 | Web dependencies as regular project dependencies | Optional `web` extra (`uv sync --extra web`) |
 | D-12 | UI logic tested with `AppTest` and a stub client | Manual UI testing only |
+
+## 16. Docker (Phase 3) — FR-14
+
+### 16.1 Components
+
+```
+ host                                   docker compose
+ ┌──────────────┐        ┌──────────────────────────────────────────────┐
+ │ browser      │─8501──►│ ui   (streamlit)   API_URL=http://api:8000  │
+ │              │─8000──►│ api  (enrollment-api)  healthcheck /health   │
+ │ LM Studio    │◄───────│   LLM_BASE_URL=http://host.docker.internal…  │
+ │ :1234        │        └──────────────────────────────────────────────┘
+ └──────────────┘            both services: image enrollment-agent
+```
+
+New files: `Dockerfile`, `.dockerignore`, `compose.yaml`.
+
+### 16.2 Image (`Dockerfile`) — AC-14.2, AC-14.5
+
+It is a multi-stage build.
+
+1. **builder**: `ghcr.io/astral-sh/uv:python3.12-bookworm-slim`
+   - `UV_COMPILE_BYTECODE=1`, `UV_LINK_MODE=copy`, `UV_PYTHON_DOWNLOADS=0`.
+   - `uv sync --locked --no-dev --no-install-project` with only `pyproject.toml` and `uv.lock`
+     copied first. Dependency layers are cached until the lock changes. A BuildKit cache
+     mount holds uv's download cache.
+   - Copy `src/` and run `uv sync --locked --no-dev` to install the project itself.
+2. **runtime**: `python:3.12-slim-bookworm`
+   - Copy `/app/.venv` and `/app/src` from the builder and put `/app/.venv/bin` on `PATH`.
+   - Create and use a non-root `app` user.
+   - `EXPOSE 8000 8501`.
+   - Default `CMD`: `enrollment-api --host 0.0.0.0 --port 8000`.
+
+The source stays at `/app/src` because the editable install points there and Streamlit
+runs the app by file path.
+
+`.dockerignore` excludes `.git`, `.venv`, `.env` and `.env.*` (AC-14.5), caches, `tests/`,
+`docs/`, `assets/` and `specs/`, so only `pyproject.toml`, `uv.lock`, `.python-version`,
+`README.md` and `src/` reach the build.
+
+### 16.3 Compose (`compose.yaml`) — AC-14.1, AC-14.3, AC-14.4, AC-14.6
+
+| | `api` | `ui` |
+|---|---|---|
+| build / image | `.` → `enrollment-agent:latest` | same image |
+| command | default (`enrollment-api --host 0.0.0.0 --port 8000`) | `streamlit run src/enrollment_agent/streamlit_app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true --browser.gatherUsageStats false` |
+| ports | `127.0.0.1:8000:8000` | `127.0.0.1:8501:8501` |
+| env | `env_file: .env` (optional) + `LLM_BASE_URL` override (below) | `API_URL=http://api:8000` |
+| healthcheck | `python -c` urllib GET `/health` every 10 s | — |
+| depends_on | — | `api: condition: service_healthy` |
+| extra_hosts | `host.docker.internal:host-gateway` (so it also works on Linux) | — |
+
+**LLM endpoint inside containers (AC-14.3)**: `localhost` in `.env` would point at the
+container itself. So compose sets
+`LLM_BASE_URL: ${DOCKER_LLM_BASE_URL:-http://host.docker.internal:1234/v1}`.
+- By default the containers reach LM Studio on the host, and the model and key still come
+  from `.env`.
+- For OpenAI, set `DOCKER_LLM_BASE_URL=https://api.openai.com/v1` in `.env`. Compose reads
+  `.env` for variable substitution, and `LLM_MODEL` / `OPENAI_API_KEY` come from it as usual.
+- `.env.example` documents `DOCKER_LLM_BASE_URL`.
+
+**LM Studio note**: Docker Desktop forwards `host.docker.internal` to the host. This was
+verified on 2026-09-23 against LM Studio listening on `127.0.0.1`, with no extra settings.
+If a setup refuses the connection, enable "Serve on Local Network" in LM Studio's server
+settings.
+
+**Project name**: `name: enrollment-agent`, so container names don't depend on the folder
+name.
+
+**Startup failures**: a missing `LLM_MODEL` / `OPENAI_API_KEY` makes the API container
+exit with the `ConfigError` message, and `docker compose logs api` shows it. There is no
+restart policy, so a bad configuration doesn't restart in a loop.
+
+### 16.4 Verification
+
+There are no new pytest tests; per A-11, tests stay on the host. Manual checks:
+1. `docker compose config` validates the file.
+2. `docker compose up --build -d`: both services start and `api` becomes healthy.
+3. `GET http://127.0.0.1:8000/health` returns the model, and a `POST /chat` for `APP-1042`
+   returns Documents Pending (container → host LM Studio works).
+4. The UI at `http://localhost:8501` answers a message and shows the tool panel.
+5. `docker run --rm enrollment-agent id -u` is non-zero (non-root), and the image contains
+   no `.env`.
+6. `docker compose down`.
+
+### 16.5 Phase 3 decisions
+
+| # | Decision | Alternative (not chosen) |
+|---|---|---|
+| D-13 | Official uv image for the build, plain `python:3.12-slim` for the runtime | Single stage with uv in the runtime image (bigger) |
+| D-14 | `DOCKER_LLM_BASE_URL` override defaulting to host LM Studio | Rewrite `localhost` in code, or a separate `.env.docker` file |
+| D-15 | Ports bound to `127.0.0.1` | Bound to all interfaces |

@@ -1,7 +1,7 @@
-# Tasks — Student Enrollment Assistant Agent (Phase 1)
+# Tasks — Student Enrollment Assistant Agent
 
 Implements: [requirements.md](requirements.md) · [design.md](design.md)
-Status: **Approved** (2026-09-23)
+Status: **Approved**: Phase 1 (A–E) and Phase 2 (F–G), 2026-09-23
 
 Rules:
 - Work top to bottom. Write each task's tests first, then implement until they pass.
@@ -118,6 +118,65 @@ Rules:
 
 ---
 
+# Phase 2 — Web Interfaces (FR-12, FR-13)
+
+## Phase F — HTTP API
+
+- [ ] **T-16 Web dependencies** · design §15.1
+  - `uv add fastapi uvicorn streamlit httpx`; add the `enrollment-api = enrollment_agent.api:main`
+    console script.
+  - Done when: `uv sync` succeeds and the existing 80 tests still pass.
+
+- [ ] **T-16b Async agent path** · D-9 · design §15.2
+  - `graph.py`: the `agent` node supports sync and async (a `RunnableLambda` with `afunc`), with
+    the iteration cap shared. `agent.py`: `EnrollmentAgent.achat()` sharing helpers with `chat()`.
+  - Tests (async, `anyio`, fake model): reply + tool events, memory across turns, iteration cap.
+  - Done when: new tests and all existing tests pass (sync behavior unchanged).
+
+- [ ] **T-17 FastAPI app** · FR-12, NFR-7, NFR-8 · design §15.2
+  - `api.py`: `create_app()`, the Pydantic schemas, async `POST /chat` (`await agent.achat`), `GET /health`, the error
+    mapping, a lifespan that builds the agent from settings, module-level `app`, and `main()`
+    with `--host/--port/--env-file`.
+  - Tests (`test_api.py`, fake model):
+    - response has `session_id`, `reply`, `tool_events` (AC-12.1)
+    - no `session_id` → a new one is returned; reusing it keeps memory (AC-12.2, 12.3)
+    - two sessions are isolated (AC-12.3)
+    - empty or whitespace message → 422 (AC-12.4)
+    - connection error → 503; other LLM error → 502, both with `detail` (AC-12.5)
+    - `/health` returns status and model (AC-12.6)
+  - Done when: tests pass, and `uv run enrollment-api` answers a `/chat` request against
+    LM Studio (manual check with `curl` or `/docs`).
+
+## Phase G — Chat UI
+
+- [ ] **T-18 API client** · FR-13 · design §15.3
+  - `api_client.py`: `ApiClient.chat()`, `ApiClient.health()`, `ApiError`.
+  - Tests (`test_api_client.py`, `httpx.MockTransport`): request payloads (with and without
+    `session_id`), JSON parsing, `ApiError` on connection error, timeout, and 4xx/5xx
+    (message includes `detail`).
+  - Done when: tests pass.
+
+- [ ] **T-19 Streamlit chat UI** · FR-13 · design §15.4
+  - `streamlit_app.py`: history, chat input, spinner, tool-call expander, sidebar with API
+    status and **New conversation**, error display.
+  - Tests (`test_streamlit_app.py`, `AppTest` + stub client):
+    - a sent message shows the user and assistant messages (AC-13.1)
+    - the second message sends the `session_id` from the first reply (AC-13.3)
+    - a reply with tool events shows a "Tool calls" expander (AC-13.4)
+    - **New conversation** clears the history and `session_id` (AC-13.5)
+    - an `ApiError` shows an error message and no assistant reply (AC-13.6)
+    - the sidebar shows the model when the API is up and an error when it is down (AC-13.7)
+  - Done when: tests pass.
+
+- [ ] **T-20 End-to-end check and docs** · FR-12, FR-13
+  - Run LM Studio, `enrollment-api` and the Streamlit app together; play the 5-turn demo in
+    the browser and confirm the tool panels and memory work.
+  - README: add the web usage (start API, start UI, `API_URL`), and update the architecture
+    diagram, layout and roadmap.
+  - Done when: the demo works in the browser and the README steps reproduce it.
+
+---
+
 ## Traceability
 
 | Requirement | Tasks |
@@ -130,9 +189,12 @@ Rules:
 | FR-9 | T-11 |
 | FR-10 | T-12, T-13, T-14 |
 | FR-11 | T-06, T-07 |
-| FR-12 | Later phase (not in this list) |
+| FR-12 | T-16, T-16b, T-17, T-20 |
+| FR-13 | T-18, T-19, T-20 |
 | NFR-1, NFR-4 | T-01, T-06 |
 | NFR-2 | T-02–T-10 |
 | NFR-3 | T-11, T-12 |
 | NFR-5 | T-09 |
-| NFR-6 | T-10 |
+| NFR-6 | T-10, T-17 |
+| NFR-7 | T-17 |
+| NFR-8 | T-17, T-18, T-19 |

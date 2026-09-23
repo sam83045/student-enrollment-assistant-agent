@@ -1,7 +1,7 @@
 # Design — Student Enrollment Assistant Agent
 
 Implements: [requirements.md](requirements.md)
-Status: **Approved** (2026-09-23)
+Status: **Approved**: Phase 1 (§1–14) and Phase 2 (§15), 2026-09-23
 
 ## 1. Tech Stack
 
@@ -15,7 +15,7 @@ Status: **Approved** (2026-09-23)
 | Config | `python-dotenv` |
 | Tests | `pytest` |
 | Interface — phase 1 | CLI |
-| Interface — later | Streamlit (chat UI), FastAPI (HTTP API) |
+| Interface — phase 2 | FastAPI + uvicorn (HTTP API), Streamlit (chat UI) calling the API via httpx (§15) |
 
 Exact versions are pinned in `uv.lock` when the project is set up.
 
@@ -296,10 +296,7 @@ Options:
 - `--output` sets the log path. Logs are kept for both providers: `docs/demo_log.md` (OpenAI,
   official) and `docs/demo_log_lmstudio.md` (local).
 
-**Later phase (FR-12)**: planned only; nothing is built for it in phase 1.
-- `streamlit_app.py`: chat UI; stores `session_id` in `st.session_state`.
-- `api.py` (FastAPI): `POST /chat {session_id?, message}` → `{session_id, reply, tool_events}`.
-- Both call `EnrollmentAgent.chat`, so the agent needs no changes.
+**Phase 2 (FR-12, FR-13)**: FastAPI API and Streamlit UI; see §15.
 
 ## 11. Error Handling
 
@@ -341,7 +338,8 @@ scripted `AIMessage`s in order.
 | FR-7 | 7.4 | test_agent, test_demo_live |
 | FR-9, FR-10 | 10 | manual, test_demo_live |
 | FR-11 | 6 | manual (run against both providers) |
-| FR-12 | 8, 10 | later phase |
+| FR-12 | 15.2 | test_api |
+| FR-13 | 15.3, 15.4 | test_api_client, test_streamlit_app, manual |
 
 ## 14. Design Decisions
 
@@ -357,3 +355,161 @@ All decisions approved 2026-09-23 as listed (first column chosen).
 | D-6 | Explicit `StateGraph` (agent + ToolNode) | Prebuilt agent helper (fewer lines, loop hidden) |
 | D-7 | `ChatOpenAI` + `base_url` for local LLM too (LM Studio default) | Native `ChatOllama` / LM Studio SDK (a second code path) |
 | D-8 | LangSmith tracing off by default; enabled via env vars if wanted | Always on |
+
+## 15. Web Interfaces (Phase 2) — FR-12, FR-13
+
+### 15.1 Components
+
+```
+ browser ──► Streamlit app ──► ApiClient ──HTTP──► FastAPI app ──► EnrollmentAgent ──► LLM
+             streamlit_app.py  api_client.py       api.py          (one instance,
+             :8501             (httpx)             :8000            InMemorySaver)
+```
+
+- The FastAPI process owns the only `EnrollmentAgent`, so all session memory lives there
+  (NFR-7). Restarting the API clears every session.
+- Streamlit never imports the agent. It only knows the API address (`API_URL`).
+- `EnrollmentAgent`, the graph and the tools are unchanged (AC-12.7).
+
+New files:
+
+```
+src/enrollment_agent/
+  api.py             # create_app(), app, main() → `enrollment-api` console script
+  api_client.py      # ApiClient, ApiError (used by the UI)
+  streamlit_app.py   # chat UI
+tests/
+  test_api.py        # FastAPI TestClient + fake model
+  test_api_client.py # httpx.MockTransport, no server
+  test_streamlit_app.py  # streamlit AppTest with a stub client
+```
+
+New dependencies: `fastapi`, `uvicorn`, `streamlit`, `httpx` (already installed through
+`openai`, now declared explicitly).
+
+### 15.2 HTTP API (`api.py`) — FR-12
+
+**App factory**: `create_app(agent: EnrollmentAgent | None = None, model_name: str | None = None)`.
+- Tests pass an agent built on the fake model.
+- With no agent, a lifespan handler calls `load_settings()` at startup and builds the agent
+  from it. A `ConfigError` stops startup with its message.
+- The agent and model name are stored on `app.state`.
+- Module-level `app = create_app()` lets `uvicorn enrollment_agent.api:app` work too.
+
+**Schemas** (Pydantic):
+
+```python
+class ChatRequest(BaseModel):
+    message: str          # stripped; must be non-empty (AC-12.4 → 422)
+    session_id: str | None = None
+
+class ToolEventOut(BaseModel):
+    name: str; args: dict; result: str | None
+
+class ChatResponse(BaseModel):
+    session_id: str; reply: str; tool_events: list[ToolEventOut]
+
+class HealthResponse(BaseModel):
+    status: Literal["ok"]; model: str
+```
+
+**Endpoints**:
+
+| Method | Path | Behavior |
+|---|---|---|
+| `POST` | `/chat` | `session_id = request.session_id or agent.new_session()`, then `agent.chat(...)`, returns `ChatResponse` |
+| `GET` | `/health` | `{"status": "ok", "model": <model name>}` |
+| `GET` | `/docs` | FastAPI's built-in interactive docs |
+
+**Error mapping (AC-12.5)**:
+
+| Exception | HTTP | `detail` |
+|---|---|---|
+| Empty message (validation) | 422 | FastAPI validation error |
+| `openai.APIConnectionError` | 503 | "The language model is unreachable. Check that LM Studio (or the configured endpoint) is running." |
+| other `openai.APIError` | 502 | "The language model returned an error: …" |
+
+**Concurrency (D-9)**: the endpoints are `async def` and `await agent.achat(...)`, so a slow
+LLM call doesn't block the event loop or tie up a thread. Different sessions run
+concurrently. Two requests on the *same* session at the same time are not supported; the
+UI sends one message at a time.
+
+**Async agent path**: this is the only change to the Phase 1 code, and it keeps the sync
+behavior.
+- `graph.py`: the `agent` node is a `RunnableLambda` with both a sync function (`model.invoke`)
+  and an async one (`await model.ainvoke`). They share the iteration-cap logic. `ToolNode`
+  and `InMemorySaver` already support async.
+- `agent.py`: `EnrollmentAgent.achat(message, session_id)` mirrors `chat()` using
+  `graph.aget_state` / `graph.ainvoke`. The two share the config and result-extraction helpers.
+- The CLI and demo keep using `chat()`.
+
+**Session IDs**: the server creates them (`uuid4().hex`). An unknown `session_id` from a
+client simply starts an empty conversation under that ID; the API never returns 404 for it.
+
+**Running**: `uv run enrollment-api [--host 127.0.0.1] [--port 8000] [--env-file .env]`
+starts uvicorn with the app.
+
+### 15.3 API client (`api_client.py`) — FR-13
+
+```python
+class ApiError(Exception): ...      # message is safe to show to the user
+
+class ApiClient:
+    def __init__(self, base_url: str, timeout: float = 180.0,
+                 transport: httpx.BaseTransport | None = None): ...
+    def chat(self, message: str, session_id: str | None) -> dict   # ChatResponse JSON
+    def health(self) -> dict                                       # HealthResponse JSON
+```
+
+- The 180 s timeout covers slow local models; a turn on LM Studio takes up to about 13 s.
+- Connection failures, timeouts and non-2xx responses all raise `ApiError`. For non-2xx
+  responses the message includes the API's `detail` (AC-13.6).
+- `transport` lets tests use `httpx.MockTransport` instead of a real server.
+
+### 15.4 Streamlit app (`streamlit_app.py`) — FR-13
+
+**State** (`st.session_state`):
+- `session_id`: `None` until the first reply, then the value returned by the API (AC-13.3).
+- `messages`: a list of `{"role": "user" | "assistant", "content": str, "tool_events": list}`.
+
+**Layout**:
+- **Sidebar**: the API status from `health()`, showing "Connected · model `…`" or an error
+  (AC-13.7); a **New conversation** button that clears `messages` and `session_id` (AC-13.5).
+- **Main**: title and a short caption, then the history rendered with `st.chat_message`, then
+  `st.chat_input("Ask about programs, deadlines or your application…")`.
+- **Tool panel (AC-13.4)**: under each assistant message with tool events, an
+  `st.expander("Tool calls (n)")`. For each event it shows the tool name, the arguments
+  (`st.json`) and the result (`st.json` when it parses, otherwise text).
+
+**Send flow**:
+1. Append and show the user message.
+2. Show `st.spinner("Thinking…")` while calling `client.chat(message, session_id)`.
+3. On success, store the `session_id` and append and show the assistant message.
+4. On `ApiError`, show `st.error(message)`. The user message stays in the history so the user
+   can retry, but no assistant message is added (AC-13.6).
+
+**Client construction**: `get_client()` builds `ApiClient(os.getenv("API_URL", "http://localhost:8000"))`.
+Tests replace `get_client` with a stub.
+
+**Running**: `uv run streamlit run src/enrollment_agent/streamlit_app.py` (port 8501).
+
+### 15.5 Testing
+
+| File | How | Covers |
+|---|---|---|
+| `test_agent.py` (extended) | `anyio` async tests, fake model | `achat` matches `chat`: reply, tool events, memory, iteration cap |
+| `test_api.py` | `TestClient(create_app(agent_with_fake_model, "fake-model"))` | AC-12.1–12.6: response shape, new vs. reused session, memory, isolation, 422, 503/502 mapping, health |
+| `test_api_client.py` | `httpx.MockTransport` | request payloads, success parsing, `ApiError` on connection error / timeout / 4xx–5xx with `detail` |
+| `test_streamlit_app.py` | `streamlit.testing.v1.AppTest` with a stub client | AC-13.1, 13.3–13.7: chat renders, session ID reused, tool panel shown, new conversation resets, error shown |
+| Manual | LM Studio + both servers | full 5-turn demo through the browser |
+
+### 15.6 Phase 2 decisions
+
+All approved 2026-09-23. D-9 was changed from the proposed sync endpoints to async.
+
+| # | Decision | Alternative (not chosen) |
+|---|---|---|
+| D-9 | `async def` endpoints + `EnrollmentAgent.achat` (async graph path) | Sync endpoints in the thread pool |
+| D-10 | Server-generated session IDs; unknown IDs start an empty conversation | Track issued IDs and return 404 for unknown ones |
+| D-11 | Web dependencies as regular project dependencies | Optional `web` extra (`uv sync --extra web`) |
+| D-12 | UI logic tested with `AppTest` and a stub client | Manual UI testing only |

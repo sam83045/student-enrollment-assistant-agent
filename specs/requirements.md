@@ -1,7 +1,7 @@
 # Requirements — Student Enrollment Assistant Agent
 
 Source: [assets/Agentic AI Case Study.pdf](../assets/Agentic%20AI%20Case%20Study.pdf)
-Status: **Approved** (2026-09-23)
+Status: **Approved**: Phase 1 (FR-1..11) and Phase 2 (FR-12..13), 2026-09-23
 
 ## 1. Overview
 
@@ -19,11 +19,12 @@ Questions outside the tools' scope are escalated to an enrollment counselor.
 - Graceful escalation for unsupported questions.
 - A CLI chat and a scripted run of the 5-turn demo conversation with a full log.
 - Switchable LLM provider (OpenAI API or a local OpenAI-compatible LLM).
+- Phase 2: a FastAPI HTTP API and a Streamlit chat UI (FR-12, FR-13).
 
 **Out of scope**
-- Real databases, authentication, or persistence across sessions.
+- Real databases, authentication, or persistence across sessions or server restarts.
 - Actually connecting the user to a counselor (the agent only offers to).
-- Web UI in phase 1. Streamlit and FastAPI interfaces are planned for a later phase (FR-12).
+- Streaming replies, containers, and switching the LLM provider from the UI.
 
 ## 3. Functional Requirements
 
@@ -103,9 +104,31 @@ Returns a dict with `program_name`, `application_deadline`,
 - AC-11.2 Works with the OpenAI API and with local OpenAI-compatible servers (e.g. Ollama)
   without code changes.
 
-**FR-12 Web interfaces (later phase, not in phase 1)**
-- AC-12.1 A Streamlit chat UI and a FastAPI HTTP API reuse the same agent without changes to it.
-- AC-12.2 Each browser/API session maps to its own conversation memory (session/thread ID).
+### Web interfaces (Phase 2)
+
+**FR-12 HTTP API (FastAPI)**: the only backend that runs the agent.
+- AC-12.1 `POST /chat` with `{message, session_id?}` returns `{session_id, reply, tool_events}`,
+  where each tool event has `name`, `args` and `result`.
+- AC-12.2 A request without `session_id` starts a new session and returns its ID.
+- AC-12.3 Requests with the same `session_id` share memory; different IDs are isolated.
+- AC-12.4 An empty or whitespace-only message is rejected with HTTP 422.
+- AC-12.5 If the LLM is unreachable the API returns HTTP 503; other LLM errors return 502.
+  Both carry a readable `detail` message.
+- AC-12.6 `GET /health` returns `{status: "ok", model}`.
+- AC-12.7 The API reuses `EnrollmentAgent` unchanged (NFR-6).
+
+**FR-13 Chat UI (Streamlit)**: a thin client of the FR-12 API.
+- AC-13.1 A chat page shows the conversation for the current browser session.
+- AC-13.2 The UI talks to the agent only through the API; the API address comes from the
+  `API_URL` environment variable (default `http://localhost:8000`).
+- AC-13.3 The UI keeps the `session_id` from the first reply and sends it with every later
+  message, so the agent remembers context.
+- AC-13.4 Each assistant reply that used tools has a collapsible "Tool calls" panel listing
+  each tool's name, arguments and result.
+- AC-13.5 A "New conversation" button clears the chat and starts a new session.
+- AC-13.6 If the API is down or returns an error, the UI shows a readable message instead of
+  crashing, and the user can retry.
+- AC-13.7 The sidebar shows whether the API is reachable and which model it uses.
 
 ## 4. Non-Functional Requirements
 
@@ -118,13 +141,20 @@ Returns a dict with `program_name`, `application_deadline`,
   The graph is built explicitly (not a one-line prebuilt agent) so the loop stays visible.
 - **NFR-6 UI independence:** The agent is independent of any interface, so CLI, Streamlit and
   FastAPI can all use it.
+- **NFR-7 Web sessions:** Session memory lives in the API process (in-memory checkpointer)
+  and is lost when the API restarts. Concurrent sessions must not interfere with each other.
+- **NFR-8 Web testability:** The API is tested with a fake model (no LLM); the UI's HTTP
+  client is tested without a running server.
 
 ## 5. Assumptions & Open Decisions
 
 | # | Item | Default chosen | Change? |
 |---|---|---|---|
-| A-1 | Interface | CLI first | Streamlit + FastAPI in a later phase (FR-12) |
+| A-1 | Interface | CLI first; FastAPI + Streamlit in Phase 2 | |
 | A-2 | Spec format | Plain Markdown (`requirements` → `design` → `tasks`) | |
 | A-3 | `missing_documents` field | Added to FR-2 | |
 | A-4 | Ambiguous "that" when several CS programs match | Agent answers for all matches | Or: ask which one |
 | A-5 | Escalation | Offer only; no real hand-off | |
+| A-6 | Web architecture | Streamlit → HTTP → FastAPI → agent (confirmed 2026-09-23) | |
+| A-7 | Web session persistence | In-memory only (confirmed) | SQLite checkpointer later |
+| A-8 | Web extras | Tool-call panel only (confirmed); no streaming, Docker or provider switch | |

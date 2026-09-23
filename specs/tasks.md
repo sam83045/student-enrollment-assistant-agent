@@ -88,23 +88,25 @@ Rules:
 
 ## Phase D — Interfaces and Demo
 
-- [ ] **T-11 CLI** · FR-9, NFR-3 · design §10
+- [x] **T-11 CLI** · FR-9, NFR-3 · design §10
   - `cli.py`: REPL, one session per run, `exit`/`quit`, `--verbose` prints tool events,
     and LLM connection errors print a friendly message.
   - Done when: `uv run enrollment-agent --verbose` chats against LM Studio (manual check).
 
-- [ ] **T-12 Demo script** · FR-10 · design §10
-  - `scripts/run_demo.py`: runs the 5 turns in one session and writes `docs/demo_log.md`
-    (header: model, base URL, timestamp; per turn: input, tool calls + args + results, reply).
-  - Done when: the script produces a complete log against LM Studio.
+- [x] **T-12 Demo script** · FR-10 · design §10
+  - `demo.py` (turns, runner, log renderer) + `scripts/run_demo.py` (`--env-file`, `--output`):
+    runs the 5 turns in one session and writes a Markdown log
+    (header: model, base URL, timestamp; per turn: input, tool calls + args + results, reply, latency).
+  - Done when: the script produces a complete log against LM Studio (`docs/demo_log_lmstudio.md`).
 
-- [ ] **T-13 Live end-to-end test** · FR-6–8, FR-10 · design §12
+- [x] **T-13 Live end-to-end test** · FR-6–8, FR-10 · design §12
   - `tests/test_demo_live.py` (`@pytest.mark.live`): the 5 per-turn behavioral assertions.
   - Done when: `uv run pytest -m live` passes against LM Studio. If the 4B model is flaky,
     record which turns fail and why before tuning the prompt.
 
 - [ ] **T-14 Official demo log** · FR-10
-  - Run the demo against the OpenAI API and commit that `docs/demo_log.md`.
+  - Create `.env.openai` (git-ignored) with the OpenAI settings, then run
+    `uv run python scripts/run_demo.py --env-file .env.openai` and commit `docs/demo_log.md`.
   - Done when: the log shows correct behavior for all 5 turns.
 
 ## Phase E — Documentation

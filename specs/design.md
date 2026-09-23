@@ -58,8 +58,9 @@ src/enrollment_agent/
   graph.py         # build_graph(model, tools, checkpointer) -> compiled StateGraph
   agent.py         # EnrollmentAgent facade, TurnResult, ToolEvent
   cli.py           # interactive chat (FR-9)
+  demo.py          # DEMO_TURNS, run_demo(), render_log(): shared by script and live test
 scripts/
-  run_demo.py      # 5-turn demo → docs/demo_log.md (FR-10)
+  run_demo.py      # 5-turn demo → docs/demo_log.md (FR-10); --env-file, --output
 tests/
   conftest.py      # FakeToolChatModel fixture
   test_data.py     # FR-4 mock data integrity
@@ -286,8 +287,14 @@ results (NFR-3).
 
 **Demo (`scripts/run_demo.py`, FR-10)**: `uv run python scripts/run_demo.py`. Runs the
 5 turns in one session and writes `docs/demo_log.md`. Each turn gets a section with the
-user input, each tool call (name, arguments, result) and the agent reply. The header
-records the model, base URL and timestamp.
+user input, each tool call (name, arguments, result), the agent reply and the latency. The
+header records the model, base URL and timestamp.
+
+Options:
+- `--env-file` selects the provider without editing `.env`, e.g. `.env.openai`. Files named
+  `.env.*` are git-ignored, except `.env.example`.
+- `--output` sets the log path. Logs are kept for both providers: `docs/demo_log.md` (OpenAI,
+  official) and `docs/demo_log_lmstudio.md` (local).
 
 **Later phase (FR-12)**: planned only; nothing is built for it in phase 1.
 - `streamlit_app.py`: chat UI; stores `session_id` in `st.session_state`.

@@ -11,7 +11,7 @@ It runs on the **OpenAI API** or a **local LLM** (LM Studio / Ollama) with no co
 You can use it from a terminal chat, a **FastAPI** HTTP API, or a **Streamlit** web UI.
 
 - Case study brief: [assets/Agentic AI Case Study.pdf](assets/Agentic%20AI%20Case%20Study.pdf)
-- Demo logs: [OpenAI](docs/demo_log.md) · [LM Studio, local](docs/demo_log_lmstudio.md)
+- Demo log (5-turn case-study conversation): [docs/demo_log_lmstudio.md](docs/demo_log_lmstudio.md)
 
 ![Streamlit chat UI: escalation and answering from session memory](docs/streamlit_demo.png)
 
@@ -156,9 +156,9 @@ uv run pytest -m live    # 5 end-to-end checks of the demo against the configure
 | 4 | Can I get a fee waiver? | No tool; escalates to an enrollment counselor |
 | 5 | What documents do I still need to submit? | Answers from session memory without asking for the ID again |
 
-Full input/output logs, including every tool call and result:
-[docs/demo_log.md](docs/demo_log.md) (OpenAI) and
-[docs/demo_log_lmstudio.md](docs/demo_log_lmstudio.md) (local).
+The full input/output log, including every tool call and result, is in
+[docs/demo_log_lmstudio.md](docs/demo_log_lmstudio.md). It was recorded with the local
+`qwen_qwen3.5-4b` model. To record one with OpenAI, run the demo with `--env-file .env.openai`.
 
 ## Project layout
 

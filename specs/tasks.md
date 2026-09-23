@@ -104,7 +104,9 @@ Rules:
   - Done when: `uv run pytest -m live` passes against LM Studio. If the 4B model is flaky,
     record which turns fail and why before tuning the prompt.
 
-- [ ] **T-14 Official demo log** · FR-10
+- [~] **T-14 Official demo log** · FR-10 · **Skipped** (2026-09-23, by decision): the submitted
+  log is the LM Studio run, `docs/demo_log_lmstudio.md`, which meets AC-10.2. The OpenAI steps
+  below stay available.
   - Create `.env.openai` (git-ignored) with the OpenAI settings, then run
     `uv run python scripts/run_demo.py --env-file .env.openai` and commit `docs/demo_log.md`.
   - Done when: the log shows correct behavior for all 5 turns.

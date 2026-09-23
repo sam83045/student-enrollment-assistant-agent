@@ -8,7 +8,8 @@ outside what its tools cover.
 
 Built with **LangGraph + LangChain** on **Python 3.12**, using spec-driven development.
 It runs on the **OpenAI API** or a **local LLM** (LM Studio / Ollama) with no code changes.
-You can use it from a terminal chat, a **FastAPI** HTTP API, or a **Streamlit** web UI.
+You can use it from a terminal chat, a **FastAPI** HTTP API, or a **Streamlit** web UI, and
+the API and UI can run in **Docker**.
 
 - Case study brief: [assets/Agentic AI Case Study.pdf](assets/Agentic%20AI%20Case%20Study.pdf)
 - Demo log (5-turn case-study conversation): [docs/demo_log_lmstudio.md](docs/demo_log_lmstudio.md)
@@ -131,6 +132,29 @@ Invoke-RestMethod http://127.0.0.1:8000/chat -Method Post -ContentType applicati
 
 An empty message returns 422. An unreachable LLM returns 503, and other LLM errors return 502.
 
+**Docker (API + UI)**
+
+Requires Docker Desktop, or Docker Engine with Compose v2. The LLM keeps running outside
+Docker.
+
+```powershell
+docker compose up --build -d     # UI http://localhost:8501 · API http://localhost:8000
+docker compose logs -f api       # follow API logs
+docker compose down              # stop and remove the containers
+```
+
+- Both services run from one image: a slim Python 3.12 image with dependencies from
+  `uv.lock` and no dev packages, running as a non-root user. `.env` files are never copied
+  into the image.
+- LLM settings come from `.env`. Inside a container `localhost` means the container itself,
+  so the endpoint is set by `DOCKER_LLM_BASE_URL`. By default that is LM Studio on the host,
+  at `http://host.docker.internal:1234/v1`.
+- To use OpenAI instead, put your key in `.env` and add
+  `DOCKER_LLM_BASE_URL=https://api.openai.com/v1`.
+- If the API can't reach LM Studio, enable **Serve on Local Network** in LM Studio's server
+  settings.
+- Ports are published on `127.0.0.1` only. The UI starts once the API reports healthy.
+
 **Run the case-study demo and write a log**
 
 ```powershell
@@ -177,6 +201,7 @@ src/enrollment_agent/
   api_client.py         HTTP client used by the UI
   streamlit_app.py      Streamlit chat UI
 scripts/run_demo.py     demo entry point
+Dockerfile, compose.yaml  one image; api + ui services
 tests/                  unit, graph, API, UI (AppTest), CLI and live tests
 docs/                   demo logs and UI screenshot
 ```
@@ -195,4 +220,4 @@ Tests are written from the acceptance criteria before the implementation.
 
 - Persistent sessions via a SQLite checkpointer.
 - Streaming replies (Server-Sent Events) for faster perceived responses.
-- Docker Compose to run the API and UI with one command.
+- Smaller UI image (a UI-only dependency set without LangChain/LangGraph).

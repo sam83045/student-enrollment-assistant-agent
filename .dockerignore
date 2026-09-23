@@ -1,0 +1,22 @@
+# Only pyproject.toml, uv.lock, .python-version, README.md and src/ are needed.
+.git
+.gitignore
+.gitattributes
+.venv
+.env
+.env.*
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.vscode
+.idea
+.playwright-mcp
+tests
+docs
+assets
+specs
+scripts
+Dockerfile
+compose.yaml

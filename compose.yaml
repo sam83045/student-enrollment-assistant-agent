@@ -1,0 +1,46 @@
+# API + Streamlit UI (FR-14, design §16.3). The LLM runs outside Docker.
+#   docker compose up --build      → UI http://localhost:8501, API http://localhost:8000
+#
+# LLM settings come from .env. Inside a container "localhost" is the container itself, so the
+# endpoint is overridden with DOCKER_LLM_BASE_URL (default: LM Studio on the host).
+# For OpenAI, set DOCKER_LLM_BASE_URL=https://api.openai.com/v1 in .env.
+
+name: enrollment-agent
+
+services:
+  api:
+    build: .
+    image: enrollment-agent:latest
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LLM_BASE_URL: ${DOCKER_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  ui:
+    image: enrollment-agent:latest
+    command:
+      - streamlit
+      - run
+      - src/enrollment_agent/streamlit_app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy

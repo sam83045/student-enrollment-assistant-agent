@@ -149,14 +149,14 @@ Rules:
 
 ## Phase G — Chat UI
 
-- [ ] **T-18 API client** · FR-13 · design §15.3
+- [x] **T-18 API client** · FR-13 · design §15.3
   - `api_client.py`: `ApiClient.chat()`, `ApiClient.health()`, `ApiError`.
   - Tests (`test_api_client.py`, `httpx.MockTransport`): request payloads (with and without
     `session_id`), JSON parsing, `ApiError` on connection error, timeout, and 4xx/5xx
     (message includes `detail`).
   - Done when: tests pass.
 
-- [ ] **T-19 Streamlit chat UI** · FR-13 · design §15.4
+- [x] **T-19 Streamlit chat UI** · FR-13 · design §15.4
   - `streamlit_app.py`: history, chat input, spinner, tool-call expander, sidebar with API
     status and **New conversation**, error display.
   - Tests (`test_streamlit_app.py`, `AppTest` + stub client):

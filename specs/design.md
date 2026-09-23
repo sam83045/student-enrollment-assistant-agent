@@ -488,8 +488,9 @@ class ApiClient:
 4. On `ApiError`, show `st.error(message)`. The user message stays in the history so the user
    can retry, but no assistant message is added (AC-13.6).
 
-**Client construction**: `get_client()` builds `ApiClient(os.getenv("API_URL", "http://localhost:8000"))`.
-Tests replace `get_client` with a stub.
+**Client construction**: `api_client.client_from_env()` builds
+`ApiClient(os.getenv("API_URL", "http://localhost:8000"))`. The app stores the client in
+`st.session_state`, one per browser session. Tests replace `client_from_env` with a stub.
 
 **Running**: `uv run streamlit run src/enrollment_agent/streamlit_app.py` (port 8501).
 

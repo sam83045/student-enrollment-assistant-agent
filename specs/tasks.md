@@ -168,7 +168,7 @@ Rules:
     - the sidebar shows the model when the API is up and an error when it is down (AC-13.7)
   - Done when: tests pass.
 
-- [ ] **T-20 End-to-end check and docs** · FR-12, FR-13
+- [x] **T-20 End-to-end check and docs** · FR-12, FR-13
   - Run LM Studio, `enrollment-api` and the Streamlit app together; play the 5-turn demo in
     the browser and confirm the tool panels and memory work.
   - README: add the web usage (start API, start UI, `API_URL`), and update the architecture

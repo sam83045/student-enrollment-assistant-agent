@@ -8,14 +8,19 @@ outside what its tools cover.
 
 Built with **LangGraph + LangChain** on **Python 3.12**, using spec-driven development.
 It runs on the **OpenAI API** or a **local LLM** (LM Studio / Ollama) with no code changes.
+You can use it from a terminal chat, a **FastAPI** HTTP API, or a **Streamlit** web UI.
 
 - Case study brief: [assets/Agentic AI Case Study.pdf](assets/Agentic%20AI%20Case%20Study.pdf)
 - Demo logs: [OpenAI](docs/demo_log.md) · [LM Studio, local](docs/demo_log_lmstudio.md)
 
+![Streamlit chat UI: escalation and answering from session memory](docs/streamlit_demo.png)
+
 ## How it works
 
 ```
- user ─► CLI / demo script ─► EnrollmentAgent.chat(message, session_id)
+ browser  ─► Streamlit UI ─HTTP─► FastAPI ─┐
+                                           ├─► EnrollmentAgent.chat / .achat
+ terminal ─► CLI / demo script ────────────┘   (message, session_id)
                                      │
                      ┌───────────────▼────────────────┐
                      │  LangGraph StateGraph          │
@@ -94,6 +99,38 @@ uv run enrollment-agent            # add --verbose to see tool calls and results
 
 Type `exit` or `quit` to end the session.
 
+**Web UI (FastAPI + Streamlit)**
+
+Start the API in one terminal and the UI in another:
+
+```powershell
+uv run enrollment-api                                        # http://127.0.0.1:8000 (docs at /docs)
+uv run streamlit run src/enrollment_agent/streamlit_app.py   # http://localhost:8501
+```
+
+- The UI calls the API at `API_URL`, which defaults to `http://localhost:8000`. Example:
+  `$env:API_URL="http://127.0.0.1:9000"`.
+- The API takes `--host`, `--port` and `--env-file`, e.g. `--env-file .env.openai`.
+- Each reply in the UI has a **Tool calls** panel showing which tools ran, with their
+  arguments and results. **New conversation** starts a fresh session.
+- Sessions live in the API process's memory and are cleared when it restarts.
+
+API example:
+
+```powershell
+$r = Invoke-RestMethod http://127.0.0.1:8000/chat -Method Post -ContentType application/json `
+       -Body '{"message": "My ID is APP-1042. What is my status?"}'
+Invoke-RestMethod http://127.0.0.1:8000/chat -Method Post -ContentType application/json `
+       -Body (@{message = "Which documents are missing?"; session_id = $r.session_id} | ConvertTo-Json)
+```
+
+| Endpoint | Request | Response |
+|---|---|---|
+| `POST /chat` | `{message, session_id?}` | `{session_id, reply, tool_events[{name, args, result}]}` |
+| `GET /health` | | `{status: "ok", model}` |
+
+An empty message returns 422. An unreachable LLM returns 503, and other LLM errors return 502.
+
 **Run the case-study demo and write a log**
 
 ```powershell
@@ -105,7 +142,7 @@ uv run python scripts/run_demo.py --output docs/demo_log_lmstudio.md
 **Tests**
 
 ```powershell
-uv run pytest            # 80 offline tests with a fake model, no LLM or network needed
+uv run pytest            # 115 offline tests (fake model, stub API client), no LLM or network needed
 uv run pytest -m live    # 5 end-to-end checks of the demo against the configured LLM
 ```
 
@@ -132,13 +169,16 @@ src/enrollment_agent/
   tools.py              lookup functions + LangChain @tool wrappers
   prompts.py            system prompt and escalation message
   graph.py              LangGraph StateGraph (agent + ToolNode, memory, iteration cap)
-  agent.py              EnrollmentAgent facade, UI-independent
+  agent.py              EnrollmentAgent facade (sync chat + async achat), UI-independent
   llm.py, config.py     ChatOpenAI factory, .env settings
   cli.py                terminal chat
   demo.py               demo turns, runner, Markdown log
+  api.py                FastAPI app: POST /chat, GET /health
+  api_client.py         HTTP client used by the UI
+  streamlit_app.py      Streamlit chat UI
 scripts/run_demo.py     demo entry point
-tests/                  unit, graph, CLI and live tests
-docs/                   generated demo logs
+tests/                  unit, graph, API, UI (AppTest), CLI and live tests
+docs/                   demo logs and UI screenshot
 ```
 
 ## Development process
@@ -153,5 +193,6 @@ Tests are written from the acceptance criteria before the implementation.
 
 ## Roadmap
 
-- Streamlit chat UI and FastAPI endpoint (FR-12). Both will reuse `EnrollmentAgent` unchanged.
 - Persistent sessions via a SQLite checkpointer.
+- Streaming replies (Server-Sent Events) for faster perceived responses.
+- Docker Compose to run the API and UI with one command.

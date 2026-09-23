@@ -235,8 +235,13 @@ about 15 lines, and it shows the reason → act → observe loop clearly (NFR-5)
 
 ### 7.5 Iteration cap (AC-5.4)
 
-The graph is invoked with `recursion_limit = 2 * max_iterations + 1`. On
-`GraphRecursionError` the facade returns `ESCALATION_MESSAGE`.
+The `agent` node counts the AI messages since the last user message. When the count
+reaches `max_iterations`, the node returns `AIMessage(ESCALATION_MESSAGE)` without calling
+the model, and `tools_condition` routes to `END`.
+
+This keeps the saved history valid. Stopping the graph with `recursion_limit` instead would
+leave AI tool calls without tool results, and OpenAI-compatible APIs reject that history on
+the next turn. `recursion_limit` is still set (`2 * max_iterations + 5`) as a safety net only.
 
 ## 8. Agent Facade (`agent.py`) — NFR-6
 
@@ -295,7 +300,7 @@ records the model, base URL and timestamp.
 |---|---|
 | Tool "not found" | Normal result; LLM explains and offers options |
 | Bad tool args / tool exception | `ToolNode` returns an error `ToolMessage` to the LLM |
-| Iteration cap reached | `ESCALATION_MESSAGE` |
+| Iteration cap reached | `agent` node returns `ESCALATION_MESSAGE`; history stays valid |
 | LLM API error (network, auth, model missing) | Raised to caller; CLI prints a clear message and continues |
 | Missing `LLM_MODEL` / `OPENAI_API_KEY` | `config.py` fails fast with an actionable message |
 

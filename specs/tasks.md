@@ -49,39 +49,41 @@ Rules:
 
 ## Phase C — Agent
 
-- [ ] **T-06 Config** · FR-11, NFR-4 · design §6, §11
+- [x] **T-06 Config** · FR-11, NFR-4 · design §6, §11
   - `config.py`: `Settings` loaded from env/`.env`; `max_iterations` defaults to 5.
   - Tests: values read from env; missing `LLM_MODEL` or `OPENAI_API_KEY` raises a clear error.
   - Done when: config tests pass.
 
-- [ ] **T-07 Model factory and prompts** · FR-6, FR-8, FR-11 · design §6, §9
+- [x] **T-07 Model factory and prompts** · FR-6, FR-8, FR-11 · design §6, §9
   - `llm.py`: `build_chat_model(settings)` → `ChatOpenAI(..., temperature=0)`.
   - `prompts.py`: `SYSTEM_PROMPT` (all design §9 rules) and `ESCALATION_MESSAGE` (exact PDF wording).
   - Tests: factory passes `base_url`/`model`/`api_key` through; the prompt contains the escalation text.
   - Done when: tests pass.
 
-- [ ] **T-08 Fake chat model fixture** · NFR-2 · design §12
+- [x] **T-08 Fake chat model fixture** · NFR-2 · design §12
   - `tests/conftest.py`: `FakeToolChatModel` (subclass of `GenericFakeChatModel` with a
     `bind_tools` that returns the model unchanged); helpers to script `AIMessage`s with `tool_calls`.
   - Done when: the fixture is used by T-09 tests.
 
-- [ ] **T-09 LangGraph agent graph** · FR-5, FR-7 · design §7
-  - `graph.py`: `build_graph(model, tools, checkpointer)` with `agent` + `ToolNode` nodes,
-    `tools_condition`, the system prompt added at call time, and `InMemorySaver`.
+- [x] **T-09 LangGraph agent graph** · FR-5, FR-7 · design §7
+  - `graph.py`: `build_graph(model, tools, max_iterations, checkpointer)` with `agent` +
+    `ToolNode` nodes, `tools_condition`, the system prompt added at call time, the iteration
+    cap inside the `agent` node, and `InMemorySaver`.
   - Tests (fake model):
     - no tool call → direct answer
     - one tool call → tool runs → final answer
     - two tool calls in one AI message → both run (AC-5.3)
     - bad tool args → error `ToolMessage`, graph continues (AC-5.5)
+    - the system prompt is sent to the model but not stored in state
+    - an endless tool loop stops at the cap with `ESCALATION_MESSAGE` and the next turn still works (AC-5.4)
     - history persists across two invocations with the same `thread_id` (AC-7.1)
     - a different `thread_id` starts empty (AC-7.4)
   - Done when: graph tests pass.
 
-- [ ] **T-10 EnrollmentAgent facade** · FR-5, NFR-6 · design §7.5, §8
-  - `agent.py`: `ToolEvent`, `TurnResult`, `EnrollmentAgent.chat()`, `new_session()`;
-    `recursion_limit` from `max_iterations`; `GraphRecursionError` → `ESCALATION_MESSAGE`.
-  - Tests: `TurnResult.reply` and `tool_events` (name, args, result) are extracted from only
-    this turn's messages; the scripted infinite tool loop hits the cap and escalates (AC-5.4).
+- [x] **T-10 EnrollmentAgent facade** · FR-5, NFR-6 · design §8
+  - `agent.py`: `ToolEvent`, `TurnResult`, `EnrollmentAgent.chat()`, `new_session()`.
+  - Tests: `TurnResult.reply` and `tool_events` (name, args, result) come from this turn's
+    messages only; sessions are isolated.
   - Done when: facade tests pass.
 
 ## Phase D — Interfaces and Demo

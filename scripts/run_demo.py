@@ -40,7 +40,7 @@ def main() -> None:
     log = render_log(
         turns, model=settings.model, base_url=settings.base_url, timestamp=datetime.now()
     )
-    output.write_text(log, encoding="utf-8")
+    output.write_text(log, encoding="utf-8", newline="\n")
     print(f"Log written to {output}")
 
 

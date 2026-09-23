@@ -111,7 +111,7 @@ Rules:
 
 ## Phase E — Documentation
 
-- [ ] **T-15 README**
+- [x] **T-15 README**
   - Overview, setup (`uv sync`, `.env`), switching LM Studio ↔ OpenAI, running the CLI, demo
     and tests, project layout, and links to the specs and demo log.
   - Done when: a fresh clone can follow the README to run the demo.
